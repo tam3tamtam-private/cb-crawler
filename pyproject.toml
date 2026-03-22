@@ -1,0 +1,14 @@
+[project]
+name = "cb-crawler"
+version = "0.1.0"
+description = "Cashback campaign crawler"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "playwright==1.43.0",
+  "psycopg2-binary==2.9.9",
+  "PyYAML==6.0.2",
+]
+
+[tool.uv]
+package = false

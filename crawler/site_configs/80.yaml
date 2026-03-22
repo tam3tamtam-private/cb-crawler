@@ -1,0 +1,10 @@
+campaign_card: "a[href*='detail.php'], a[href*='ad/detail.php']"
+title: "h3"
+reward: "em"
+link:
+  selector: "a"
+  attribute: "href"
+pagination:
+  type: "url_param"
+  selector: ""
+scroll: false

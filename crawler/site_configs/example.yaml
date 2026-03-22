@@ -1,0 +1,10 @@
+campaign_card: ".card"
+title: ".title"
+reward: ".reward"
+link:
+  selector: "a"
+  attribute: "href"
+pagination:
+  type: "next_button"
+  selector: ".next"
+scroll: true
