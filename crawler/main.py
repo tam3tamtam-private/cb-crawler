@@ -1,4 +1,6 @@
 from typing import Dict, List
+import argparse
+import os
 from playwright.sync_api import sync_playwright
 from crawler import config
 from crawler.crawler.cashback import CashbackCrawler
@@ -22,7 +24,28 @@ def _dedupe_run(rows: List[Dict[str, object]], seen: set) -> List[Dict[str, obje
     return unique
 
 
-def main() -> None:
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="cb-crawler")
+    parser.add_argument(
+        "--webpage-id",
+        dest="webpage_id",
+        type=str,
+        default="",
+        help="Filter categories by webpage_id (comma-separated).",
+    )
+    return parser.parse_args()
+
+
+def _apply_webpage_filter(arg: str) -> None:
+    if not arg:
+        return
+    os.environ["WEBPAGE_ID_FILTER"] = arg
+    config.set_webpage_id_filter(arg)
+
+
+def crawl(webpage_id: str | None = None) -> None:
+    if webpage_id:
+        _apply_webpage_filter(webpage_id)
     logger = setup_logger()
     crawl_id = generate_crawl_id()
     logger.info("Starting crawl: %s", crawl_id)
@@ -99,5 +122,10 @@ def main() -> None:
     conn.close()
 
 
+def run() -> None:
+    args = _parse_args()
+    crawl(webpage_id=args.webpage_id)
+
+
 if __name__ == "__main__":
-    main()
+    run()

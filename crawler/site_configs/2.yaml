@@ -1,0 +1,10 @@
+campaign_card: "a.thumb_slots_link"
+title: "p.store"
+reward: "p.caption"
+link:
+  selector: "a.thumb_slots_link"
+  attribute: "href"
+pagination:
+  type: "next_button"
+  selector: "#catalog_see_more .btn"
+scroll: false

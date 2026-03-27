@@ -52,6 +52,24 @@ ENABLE_URL_PAGINATION = os.getenv("ENABLE_URL_PAGINATION", "true").lower() == "t
 # Site configs
 SITE_CONFIG_DIR = os.getenv("SITE_CONFIG_DIR", "crawler/site_configs")
 
+# Optional filters
+WEBPAGE_ID_FILTER = os.getenv("WEBPAGE_ID_FILTER")
+WEBPAGE_ID_FILTERS = (
+    [int(x.strip()) for x in WEBPAGE_ID_FILTER.split(",") if x.strip()]
+    if WEBPAGE_ID_FILTER
+    else []
+)
+
+
+def set_webpage_id_filter(value: str) -> None:
+    global WEBPAGE_ID_FILTER, WEBPAGE_ID_FILTERS
+    WEBPAGE_ID_FILTER = value or ""
+    WEBPAGE_ID_FILTERS = (
+        [int(x.strip()) for x in WEBPAGE_ID_FILTER.split(",") if x.strip()]
+        if WEBPAGE_ID_FILTER
+        else []
+    )
+
 # Insertion
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "500"))
 

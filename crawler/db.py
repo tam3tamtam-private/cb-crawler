@@ -22,10 +22,14 @@ def fetch_categories(conn) -> List[Dict[str, str]]:
         SELECT category_id, webpage_id, category_url
         FROM cb_m_category
         WHERE category_url IS NOT NULL
-        ORDER BY category_id
     """
+    params = []
+    if config.WEBPAGE_ID_FILTERS:
+        sql += " AND webpage_id = ANY(%s)"
+        params.append(config.WEBPAGE_ID_FILTERS)
+    sql += " ORDER BY category_id"
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, params)
         rows = cur.fetchall()
     return [
         {"category_id": r[0], "webpage_id": r[1], "category_url": r[2]}
