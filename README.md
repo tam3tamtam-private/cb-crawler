@@ -53,6 +53,28 @@ Select environment by setting `ENV`.
 ENV=dev uv run python -m crawler.main
 ```
 
+**Run One Website**
+Pass `--webpage-id` to filter the crawl by `webpage_id`.
+```bash
+ENV=dev uv run python -m crawler.main --webpage-id 2
+```
+
+Multiple IDs are supported (comma-separated):
+```bash
+ENV=dev uv run python -m crawler.main --webpage-id 2,80
+```
+
+**Run From Python**
+```python
+from crawler import crawl
+
+# Single website
+crawl(webpage_id="2")
+
+# Multiple websites
+crawl(webpage_id="2,80")
+```
+
 **Run (STG / PROD)**
 For remote Supabase, keep password out of YAML and export it.
 ```bash

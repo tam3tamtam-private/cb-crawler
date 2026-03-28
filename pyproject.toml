@@ -11,4 +11,7 @@ dependencies = [
 ]
 
 [tool.uv]
-package = false
+package = true
+
+[project.scripts]
+cb-crawler = "crawler.main:run"

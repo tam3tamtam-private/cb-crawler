@@ -5,7 +5,7 @@ requires-python = ">=3.10, <3.13"
 [[package]]
 name = "cb-crawler"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "playwright" },
     { name = "psycopg2-binary" },
