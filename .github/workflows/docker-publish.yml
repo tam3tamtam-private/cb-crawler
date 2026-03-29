@@ -11,10 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-<<<<<<< HEAD
   CONTAINER_NAME: cb-crawler
-=======
->>>>>>> main
 
 jobs:
   docker:
@@ -59,7 +56,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-<<<<<<< HEAD
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -87,5 +83,3 @@ jobs:
               --restart unless-stopped \
               --env-file /opt/cb-crawler/cb-crawler.env \
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-=======
->>>>>>> main
