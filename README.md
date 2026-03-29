@@ -133,12 +133,16 @@ This repo includes `.github/workflows/docker-publish.yml` to build and publish a
 - Registry: `ghcr.io/tam3tamtam-private/cb-crawler`
 - Triggers: pushes to `main`, tags matching `v*`, and manual runs from the Actions tab
 - Tags: branch name, git tag, commit SHA, and `latest` on the default branch
+- On pushes to `main`, the workflow also SSHes into the Oracle Cloud VM, pulls `:latest`, and restarts the `cb-crawler` container
 
 Before the first publish, make sure:
 1. GitHub Actions is enabled for the repository.
 2. In `Settings -> Actions -> General -> Workflow permissions`, `Read and write permissions` is enabled so `GITHUB_TOKEN` can publish the package.
 3. If your default branch is not `main`, update the workflow trigger.
 4. If this is the first GHCR publish for the repo, confirm the package is visible to the repository and inherits repository permissions.
+5. Add these GitHub Actions variables: `ORACLE_VM_HOST`, `ORACLE_VM_USER`, `ORACLE_VM_PORT` (optional), and `GHCR_USERNAME`.
+6. Add these GitHub Actions secrets: `ORACLE_VM_SSH_KEY` and `GHCR_TOKEN`.
+7. On the Oracle VM, create `/opt/cb-crawler/cb-crawler.env` with the runtime environment variables the container needs, for example `ENV=prod`, database settings, and `PGPASSWORD`.
 
 After the workflow runs, pull the image with:
 ```bash
