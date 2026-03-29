@@ -68,14 +68,14 @@ jobs:
       - name: Deploy latest image on Oracle Cloud VM
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.ORACLE_VM_HOST }}
-          username: ${{ secrets.ORACLE_VM_USER }}
+          host: ${{ vars.ORACLE_VM_HOST }}
+          username: ${{ vars.ORACLE_VM_USER }}
           key: ${{ secrets.ORACLE_VM_SSH_KEY }}
-          port: ${{ secrets.ORACLE_VM_PORT || '22' }}
+          port: ${{ vars.ORACLE_VM_PORT || '22' }}
           script_stop: true
           script: |
             set -eu
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker rm -f ${{ env.CONTAINER_NAME }} || true
             docker run -d \
