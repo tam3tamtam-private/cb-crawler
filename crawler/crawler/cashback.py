@@ -153,8 +153,11 @@ class CashbackCrawler(BaseCrawler):
     def crawl_category(
         self, category: Dict[str, str], site: SiteConfig
     ) -> List[Dict[str, object]]:
-        self.page.goto(category["category_url"], timeout=config.NAVIGATION_TIMEOUT_MS)
-        self.page.wait_for_load_state("domcontentloaded")
+        self.page.goto(
+            category["category_url"],
+            timeout=config.NAVIGATION_TIMEOUT_MS,
+            wait_until="domcontentloaded",
+        )
         self._wait_for_items(site)
 
         results: List[Dict[str, object]] = []
@@ -198,7 +201,11 @@ class CashbackCrawler(BaseCrawler):
                     if not next_url:
                         break
                     try:
-                        self.page.goto(next_url, timeout=config.NAVIGATION_TIMEOUT_MS)
+                        self.page.goto(
+                            next_url,
+                            timeout=config.NAVIGATION_TIMEOUT_MS,
+                            wait_until="domcontentloaded",
+                        )
                         self._wait_for_items(site)
                         helpers.random_delay(config.DELAY_MIN_SEC, config.DELAY_MAX_SEC)
                     except PlaywrightTimeoutError:

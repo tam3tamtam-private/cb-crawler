@@ -25,4 +25,6 @@ playwright-report/
 .env
 .env.*
 
+
+# artifacts/failures
 artifacts/
