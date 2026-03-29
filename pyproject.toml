@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cb-crawler"
 version = "0.1.0"
@@ -12,6 +16,9 @@ dependencies = [
 
 [tool.uv]
 package = true
+
+[tool.setuptools.packages.find]
+include = ["crawler*"]
 
 [project.scripts]
 cb-crawler = "crawler.main:run"
