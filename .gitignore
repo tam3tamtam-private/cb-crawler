@@ -24,3 +24,7 @@ playwright-report/
 # Secrets
 .env
 .env.*
+
+
+# artifacts/failures
+artifacts/

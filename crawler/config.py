@@ -32,15 +32,15 @@ PGPASSWORD = os.getenv("PGPASSWORD")
 
 # Crawler
 HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
-BROWSER_TIMEOUT_MS = int(os.getenv("BROWSER_TIMEOUT_MS", "30000"))
-NAVIGATION_TIMEOUT_MS = int(os.getenv("NAVIGATION_TIMEOUT_MS", "45000"))
+BROWSER_TIMEOUT_MS = int(os.getenv("BROWSER_TIMEOUT_MS", "20000"))
+NAVIGATION_TIMEOUT_MS = int(os.getenv("NAVIGATION_TIMEOUT_MS", "10000"))
 
 # Rate limiting / politeness
 DELAY_MIN_SEC = float(os.getenv("DELAY_MIN_SEC", "0.4"))
 DELAY_MAX_SEC = float(os.getenv("DELAY_MAX_SEC", "1.2"))
 
 # Retry
-CATEGORY_RETRIES = int(os.getenv("CATEGORY_RETRIES", "3"))
+CATEGORY_RETRIES = int(os.getenv("CATEGORY_RETRIES", "2"))
 
 # Scrolling / pagination
 ENABLE_INFINITE_SCROLL = os.getenv("ENABLE_INFINITE_SCROLL", "true").lower() == "true"
@@ -75,3 +75,8 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "500"))
 
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# Failure artifacts
+FAILURE_SCREENSHOT_DIR = os.getenv(
+    "FAILURE_SCREENSHOT_DIR", "artifacts/failures"
+)

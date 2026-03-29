@@ -87,6 +87,64 @@ ENV=stg uv run python -m crawler.main
 ENV=stg HEADLESS=false uv run python -m crawler.main
 ```
 
+**Docker**
+This repo includes a Docker image based on Playwright's Python image (`mcr.microsoft.com/playwright/python:v1.43.0-jammy`).
+
+Build the image locally:
+```bash
+docker build -t cb-crawler .
+```
+
+Published image tag:
+```bash
+ghcr.io/tam3tamtam-private/cb-crawler:latest
+```
+
+Run it by passing the same environment variables the app already expects:
+```bash
+docker run --rm \
+  -e ENV=stg \
+  -e DATABASE_URL="your_database_url" \
+  -e PGPASSWORD="your_secret" \
+  ghcr.io/tam3tamtam-private/cb-crawler:latest
+```
+
+You can also override the command to target one or more websites:
+```bash
+docker run --rm \
+  -e ENV=dev \
+  ghcr.io/tam3tamtam-private/cb-crawler:latest \
+  python -m crawler.main --webpage-id 2,80
+```
+
+Run in headed mode inside the container:
+```bash
+docker run --rm \
+  -e ENV=dev \
+  -e DATABASE_URL="your_database_url" \
+  -e HEADLESS=false \
+  ghcr.io/tam3tamtam-private/cb-crawler:latest
+```
+
+Note: `HEADLESS=false` inside Docker does not automatically display a browser window on your host machine. It only runs the browser in headed mode inside the container.
+
+**GitHub Actions Docker Publish**
+This repo includes `.github/workflows/docker-publish.yml` to build and publish an image to GitHub Container Registry:
+- Registry: `ghcr.io/tam3tamtam-private/cb-crawler`
+- Triggers: pushes to `main`, tags matching `v*`, and manual runs from the Actions tab
+- Tags: branch name, git tag, commit SHA, and `latest` on the default branch
+
+Before the first publish, make sure:
+1. GitHub Actions is enabled for the repository.
+2. In `Settings -> Actions -> General -> Workflow permissions`, `Read and write permissions` is enabled so `GITHUB_TOKEN` can publish the package.
+3. If your default branch is not `main`, update the workflow trigger.
+4. If this is the first GHCR publish for the repo, confirm the package is visible to the repository and inherits repository permissions.
+
+After the workflow runs, pull the image with:
+```bash
+docker pull ghcr.io/tam3tamtam-private/cb-crawler:latest
+```
+
 **Notes**
 - Rows without a title or URL are skipped.
 - A warning is logged if a category yields zero campaigns.

@@ -100,6 +100,25 @@ def crawl(webpage_id: str | None = None) -> None:
                         success = True
                         break
                     except Exception as exc:
+                        screenshot_path = None
+                        try:
+                            screenshot_path = crawler.capture_failure_screenshot(
+                                category["category_id"], attempt
+                            )
+                        except Exception as screenshot_exc:
+                            logger.warning(
+                                "Failed to capture screenshot for category %s attempt %d: %s",
+                                category["category_id"],
+                                attempt,
+                                screenshot_exc,
+                            )
+                        if screenshot_path:
+                            logger.info(
+                                "Saved failure screenshot for category %s attempt %d: %s",
+                                category["category_id"],
+                                attempt,
+                                screenshot_path,
+                            )
                         logger.exception(
                             "Category %s failed (attempt %d/%d): %s",
                             category["category_id"],
