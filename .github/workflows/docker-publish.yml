@@ -77,11 +77,14 @@ jobs:
           script_stop: true
           script: |
             set -eu
+            sudo mkdir -p /opt/cb-crawler
+            sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null <<EOF
+            ENV=${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
+            PGHOST=${{ vars.PGHOST }}
+            PGDATABASE=${{ vars.PGDATABASE }}
+            PGUSER=${{ vars.PGUSER }}
+            PGPASSWORD=${{ secrets.PGPASSWORD }}
+            EOF
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker rm -f ${{ env.CONTAINER_NAME }} || true
-            docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              --restart unless-stopped \
-              --env-file /opt/cb-crawler/cb-crawler.env \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.CONTAINER_NAME }}:${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
