@@ -140,8 +140,8 @@ Before the first publish, make sure:
 2. In `Settings -> Actions -> General -> Workflow permissions`, `Read and write permissions` is enabled so `GITHUB_TOKEN` can publish the package.
 3. If your default branch is not `main`, update the workflow trigger.
 4. If this is the first GHCR publish for the repo, confirm the package is visible to the repository and inherits repository permissions.
-5. Add these GitHub Actions variables: `ORACLE_VM_HOST`, `ORACLE_VM_USER`, `ORACLE_VM_PORT` (optional), and `GHCR_USERNAME`.
-6. Add these GitHub Actions secrets: `ORACLE_VM_SSH_KEY` and `GHCR_TOKEN`.
+5. Add these GitHub Actions variables: `ORACLE_VM_HOST`, `ORACLE_VM_USER`, `ORACLE_VM_PORT` (optional), `GHCR_USERNAME`, `PGHOST`, `PGDATABASE`, and `PGUSER`.
+6. Add these GitHub Actions secrets: `ORACLE_VM_SSH_KEY`, `GHCR_TOKEN`, and `PGPASSWORD`.
 7. On the Oracle VM, create `/opt/cb-crawler/cb-crawler.env` with the runtime environment variables the container needs, for example `ENV=prod`, database settings, and `PGPASSWORD`.
 8. Install Docker on the Oracle VM.
 https://docs.docker.com/engine/install/ubuntu/
@@ -172,6 +172,10 @@ The workflow expects the Oracle VM to:
 - accept SSH connections from GitHub Actions
 - be able to run `docker login`, `docker pull`, `docker rm`, and `docker run`
 - have `/opt/cb-crawler/cb-crawler.env` present before deployment starts
+
+GitHub Actions configuration rule of thumb:
+- Use variables for non-sensitive values such as `PGHOST`, `PGDATABASE`, and `PGUSER`
+- Use secrets for sensitive values such as `PGPASSWORD`, `GHCR_TOKEN`, and `ORACLE_VM_SSH_KEY`
 
 After the workflow runs, pull the image with:
 ```bash
