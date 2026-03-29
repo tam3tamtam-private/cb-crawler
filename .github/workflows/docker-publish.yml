@@ -3,6 +3,7 @@ name: Build and Publish Docker Image
 on:
   push:
     branches:
+      - develop
       - main
     tags:
       - "v*"
@@ -58,9 +59,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
     needs: docker
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
     permissions:
       contents: read
 
