@@ -78,13 +78,13 @@ jobs:
           script: |
             set -eu
             sudo mkdir -p /opt/cb-crawler
-            sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null <<EOF
-            ENV=${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
-            PGHOST=${{ vars.PGHOST }}
-            PGDATABASE=${{ vars.PGDATABASE }}
-            PGUSER=${{ vars.PGUSER }}
-            PGPASSWORD=${{ secrets.PGPASSWORD }}
-            EOF
+            printf '%s\n' \
+              "ENV=${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}" \
+              "PGHOST=${{ vars.PGHOST }}" \
+              "PGDATABASE=${{ vars.PGDATABASE }}" \
+              "PGUSER=${{ vars.PGUSER }}" \
+              "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
+              | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.CONTAINER_NAME }}:${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
