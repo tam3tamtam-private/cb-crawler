@@ -1,29 +1,38 @@
-name: Build and Publish Docker Image
+name: Build and Promote Docker Image
 
 on:
   push:
     branches:
       - develop
-      - main
     tags:
       - "v*"
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  CONTAINER_NAME: cb-crawler
 
 jobs:
-  docker:
+  build_image:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_tag: ${{ steps.image.outputs.image_tag }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: image
+        run: echo "image_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,10 +50,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=${{ steps.image.outputs.image_tag }}
+            type=raw,value=stg,enable=${{ github.ref == 'refs/heads/develop' }}
             type=ref,event=tag
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -58,16 +66,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
-    needs: docker
+  pull_stg_image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: build_image
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
+    environment: stg
     permissions:
       contents: read
 
     steps:
-      - name: Deploy latest image on Oracle Cloud VM
+      - name: Pull tested image on staging VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.ORACLE_VM_HOST }}
@@ -77,14 +85,65 @@ jobs:
           script_stop: true
           script: |
             set -eu
-            sudo mkdir -p /opt/cb-crawler
-            printf '%s\n' \
-              "ENV=${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}" \
-              "PGHOST=${{ vars.PGHOST }}" \
-              "PGDATABASE=${{ vars.PGDATABASE }}" \
-              "PGUSER=${{ vars.PGUSER }}" \
-              "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
-              | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stg"
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.CONTAINER_NAME }}:${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
+            docker pull "$IMAGE_REF"
+
+  promote_prod:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set promoted image tag
+        id: image
+        run: echo "image_tag=sha-${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote tested image to prod tag
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }}
+
+  pull_prod_image:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop'
+    needs: promote_prod
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+
+    steps:
+      - name: Pull promoted image on production VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.ORACLE_VM_HOST }}
+          username: ${{ vars.ORACLE_VM_USER }}
+          key: ${{ secrets.ORACLE_VM_SSH_KEY }}
+          port: ${{ vars.ORACLE_VM_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -eu
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
+            docker pull "$IMAGE_REF"
