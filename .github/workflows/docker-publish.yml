@@ -1,13 +1,16 @@
-name: Build and Publish Docker Image
+name: Build and Promote Docker Image
 
 on:
   push:
     branches:
       - develop
-      - main
     tags:
       - "v*"
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
 
 env:
   REGISTRY: ghcr.io
@@ -16,14 +19,21 @@ env:
 
 jobs:
   docker:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_tag: ${{ steps.image.outputs.image_tag }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: image
+        run: echo "image_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,10 +51,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=${{ steps.image.outputs.image_tag }}
+            type=raw,value=stg,enable=${{ github.ref == 'refs/heads/develop' }}
             type=ref,event=tag
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -58,16 +67,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+  deploy_stg:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: docker
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
+    environment: stg
     permissions:
       contents: read
 
     steps:
-      - name: Deploy latest image on Oracle Cloud VM
+      - name: Deploy tested image to staging VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.ORACLE_VM_HOST }}
@@ -77,14 +86,64 @@ jobs:
           script_stop: true
           script: |
             set -eu
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.docker.outputs.image_tag }}"
             sudo mkdir -p /opt/cb-crawler
             printf '%s\n' \
-              "ENV=${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}" \
+              "ENV=stg" \
+              "IMAGE_TAG=${{ needs.docker.outputs.image_tag }}" \
               "PGHOST=${{ vars.PGHOST }}" \
               "PGDATABASE=${{ vars.PGDATABASE }}" \
               "PGUSER=${{ vars.PGUSER }}" \
               "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
               | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.CONTAINER_NAME }}:${{ github.ref == 'refs/heads/main' && 'prod' || 'stg' }}
+            docker pull "$IMAGE_REF"
+            docker rm -f ${{ env.CONTAINER_NAME }} || true
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart unless-stopped \
+              --env-file /opt/cb-crawler/cb-crawler.env \
+              "$IMAGE_REF"
+
+  deploy_prod:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy promoted image to production VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.ORACLE_VM_HOST }}
+          username: ${{ vars.ORACLE_VM_USER }}
+          key: ${{ secrets.ORACLE_VM_SSH_KEY }}
+          port: ${{ vars.ORACLE_VM_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -eu
+            IMAGE_TAG="sha-${{ github.event.pull_request.head.sha }}"
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+            sudo mkdir -p /opt/cb-crawler
+            printf '%s\n' \
+              "ENV=prod" \
+              "IMAGE_TAG=${IMAGE_TAG}" \
+              "PGHOST=${{ vars.PGHOST }}" \
+              "PGDATABASE=${{ vars.PGDATABASE }}" \
+              "PGUSER=${{ vars.PGUSER }}" \
+              "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
+              | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
+            docker pull "$IMAGE_REF"
+            docker tag "$IMAGE_REF" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
+            docker rm -f ${{ env.CONTAINER_NAME }} || true
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart unless-stopped \
+              --env-file /opt/cb-crawler/cb-crawler.env \
+              "$IMAGE_REF"
