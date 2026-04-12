@@ -186,3 +186,6 @@ docker pull ghcr.io/tam3tamtam-private/cb-crawler:latest
 - Rows without a title or URL are skipped.
 - A warning is logged if a category yields zero campaigns.
 - URL pagination is used when `pagination.type: url_param` and `page=` exists.
+
+# ssh
+ssh-add ~/.ssh/ssh-key-2026-03-29.key
