@@ -15,10 +15,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  CONTAINER_NAME: cb-crawler
 
 jobs:
-  docker:
+  build_image:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -67,16 +66,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy_stg:
+  pull_stg_image:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: docker
+    needs: build_image
     runs-on: ubuntu-latest
     environment: stg
     permissions:
       contents: read
 
     steps:
-      - name: Deploy tested image to staging VM
+      - name: Pull tested image on staging VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.ORACLE_VM_HOST }}
@@ -86,38 +85,56 @@ jobs:
           script_stop: true
           script: |
             set -eu
-            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.docker.outputs.image_tag }}"
-            sudo mkdir -p /opt/cb-crawler
-            printf '%s\n' \
-              "ENV=stg" \
-              "IMAGE_TAG=${{ needs.docker.outputs.image_tag }}" \
-              "PGHOST=${{ vars.PGHOST }}" \
-              "PGDATABASE=${{ vars.PGDATABASE }}" \
-              "PGUSER=${{ vars.PGUSER }}" \
-              "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
-              | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stg"
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
             docker pull "$IMAGE_REF"
-            docker rm -f ${{ env.CONTAINER_NAME }} || true
-            docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              --restart unless-stopped \
-              --env-file /opt/cb-crawler/cb-crawler.env \
-              "$IMAGE_REF"
 
-  deploy_prod:
+  promote_prod:
     if: >
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.ref == 'develop'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Set promoted image tag
+        id: image
+        run: echo "image_tag=sha-${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote tested image to prod tag
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image.outputs.image_tag }}
+
+  pull_prod_image:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref == 'develop'
+    needs: promote_prod
+    runs-on: ubuntu-latest
     environment: prod
     permissions:
       contents: read
 
     steps:
-      - name: Deploy promoted image to production VM
+      - name: Pull promoted image on production VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ vars.ORACLE_VM_HOST }}
@@ -127,23 +144,6 @@ jobs:
           script_stop: true
           script: |
             set -eu
-            IMAGE_TAG="sha-${{ github.event.pull_request.head.sha }}"
-            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-            sudo mkdir -p /opt/cb-crawler
-            printf '%s\n' \
-              "ENV=prod" \
-              "IMAGE_TAG=${IMAGE_TAG}" \
-              "PGHOST=${{ vars.PGHOST }}" \
-              "PGDATABASE=${{ vars.PGDATABASE }}" \
-              "PGUSER=${{ vars.PGUSER }}" \
-              "PGPASSWORD=${{ secrets.PGPASSWORD }}" \
-              | sudo tee /opt/cb-crawler/cb-crawler.env >/dev/null
+            IMAGE_REF="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod"
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ vars.GHCR_USERNAME }}" --password-stdin
             docker pull "$IMAGE_REF"
-            docker tag "$IMAGE_REF" ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod
-            docker rm -f ${{ env.CONTAINER_NAME }} || true
-            docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              --restart unless-stopped \
-              --env-file /opt/cb-crawler/cb-crawler.env \
-              "$IMAGE_REF"
